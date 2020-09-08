@@ -13,19 +13,39 @@ WORKDIR /install
 COPY requirements.txt /requirements.txt
 RUN pip install --prefix="/install" -r /requirements.txt
 
+
+
+
 # Switch back to our base image and copy in all of our built packages and source code
-FROM base
+FROM node:12-slim 
+
+RUN apt-get update \
+  && apt-get install -y wget gnupg \
+	&& wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+	&& sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+	&& apt-get update \
+	&& apt-get install -y google-chrome-stable fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf libxss1 \
+	--no-install-recommends \
+	&& rm -rf /var/lib/apt/lists/*
+
+RUN npm i puppeteer \
+# Add user so we don't need --no-sandbox.
+# same layer as npm install to keep re-chowned files from using up several hundred MBs more space
+	&& groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+	&& mkdir -p /home/pptruser/Downloads \
+	&& chown -R pptruser:pptruser /home/pptruser \
+	&& chown -R pptruser:pptruser /node_modules
+
+RUN apt-get update
+RUN apt-get -y install python3
+
 COPY --from=builder /install /usr/local
 COPY src /app
 
-
-RUN apk --no-cache add --update nodejs npm
-RUN npm install -g puppeteer --unsafe-perm=true --allow-root
-RUN npm install -g wappalyzer --unsafe-perm=true --allow-root
-
-# Install any binary dependencies needed in our final image
-# RUN apk --no-cache add --update my_binary_dependency
+# Run everything after as non-privileged user.
+#USER pptruser
 
 # Finally, lets run our app!
 WORKDIR /app
-CMD python app.py --log-level DEBUG
+RUN ls /app
+CMD python3 app.py --log-level DEBUG

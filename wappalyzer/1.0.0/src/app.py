@@ -2,7 +2,6 @@ import time
 import json
 import socket
 import asyncio
-import requests
 import subprocess
 
 from walkoff_app_sdk.app_base import AppBase
@@ -21,52 +20,54 @@ class Wappalyzer(AppBase):
         self.headers = {"Content-Type": "application/json"}
         super().__init__(redis, logger, console_logger)
 
-
     async def analyze_target(self, target, batchSize, delay, maxdepth, maxurls, maxwait, recursive, useragent, htmlmaxcols, htmlmaxrows):
-
-        cmd = "wappalyzer"
+        cmd = ["wappalyzer"]
         if batchSize != "":
-            cmd = cmd + " --batch-size=" + batchSize
-
+            cmd.append("--batch-size=" + batchSize)
+    
         if delay != "":
-            cmd = cmd + " --delay=" + delay
-
+            cmd.append("--delay=" + delay)
+    
         if maxdepth != "":
-            cmd = cmd + " --max-depth=" + maxdepth
-
+            cmd.append("--max-depth=" + maxdepth)
+    
         if maxurls != "":
-            cmd = cmd + " --max-urls=" + maxurls
-
+            cmd.append("--max-urls=" + maxurls)
+    
         if maxwait != "":
-            cmd = cmd + " --max-wait=" + maxwait
-
+            cmd.append("--max-wait=" + maxwait)
+    
         if recursive == True:
-            cmd = cmd + " --recursive"
-
+            cmd.append("--recursive")
+    
         if useragent != "":
-            cmd = cmd + " --user-agent=" + useragent
-
+            cmd.append("--user-agent=" + useragent)
+    
         if htmlmaxcols != "":
-            cmd = cmd + " --html-max-cols=" + htmlmaxcols
-
+            cmd.append("--html-max-cols=" + htmlmaxcols)
+    
         if htmlmaxrows != "":
-            cmd = cmd + " --html-max-rows=" + htmlmaxrows
-
-        cmd = cmd + " " + target
+            cmd.append("--html-max-rows=" + htmlmaxrows)
+    
+        cmd.append(target)
         
-        p = subprocess.Popen("wappalyzer", stdout=subprocess.PIPE, shell=True)
-        
-        (output, err) = p.communicate()
-        p_status = p.wait()
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout = process.communicate()
+        item = ""
+        if len(stdout[0]) > 0:
+            print("Target %s has been wappalyzed" % target)
+            item = stdout[0]
+        else:
+            print("Target %s FAILED to be wappalyzed" % target)
+            item = stdout[1]
+    
+        try:
+            ret = item.decode("utf-8")
+            return ret 
+        except:
+            return item
 
-        """
-        Returns log of what was wappalyzed
-        """
-        message = f"target {target} has been wappalyzed"
-
-        # This logs to the docker logs
-        self.logger.info(message)
-        return output
+        return item
 
 if __name__ == "__main__":
     asyncio.run(Wappalyzer.run(), debug=True)
